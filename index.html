@@ -2,18 +2,53 @@
 <html lang="hi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Needle Distribution</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>सुई वितरण</title>
 
 <style>
-body{font-family:system-ui;background:#f4f6f8;margin:0;padding:16px}
-.card{background:#fff;border-radius:14px;padding:16px;margin-bottom:14px}
-h2{margin:0 0 10px}
-select,input,button{width:100%;padding:10px;margin-top:8px;font-size:16px}
-button{background:#111;color:#fff;border:none;border-radius:10px}
-.row{display:flex;gap:8px}
-.row>*{flex:1}
-.small{font-size:14px;color:#555}
+  body{
+    margin:0;
+    padding:16px;
+    background:#f4f6f8;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont;
+  }
+  h2{margin:0 0 12px}
+  h3{margin:0 0 8px}
+  .card{
+    background:#fff;
+    border-radius:14px;
+    padding:14px;
+    margin-bottom:14px;
+  }
+  label{
+    font-size:14px;
+    color:#444;
+  }
+  select,input,button{
+    width:100%;
+    padding:10px;
+    margin-top:8px;
+    font-size:16px;
+    border-radius:10px;
+    border:1px solid #ddd;
+  }
+  button{
+    background:#111;
+    color:#fff;
+    border:none;
+    font-weight:600;
+  }
+  .row{
+    display:flex;
+    gap:8px;
+    margin-top:8px;
+  }
+  .row input:first-child{
+    background:#f0f0f0;
+  }
+  .row > *{
+    flex:1;
+  }
 </style>
 </head>
 
@@ -23,76 +58,124 @@ button{background:#111;color:#fff;border:none;border-radius:10px}
 
 <div class="card">
   <label>मशीन चुनें</label>
-  <select id="machine" onchange="loadNeedles()"></select>
+  <select id="machine" onchange="loadNeedles()">
+    <option value="">-- मशीन चुनें --</option>
+  </select>
 </div>
 
 <div class="card">
   <h3>डायल सुई</h3>
-  <div id="dial"></div>
+  <div id="dial">मशीन चुनें</div>
 </div>
 
 <div class="card">
   <h3>सिलेंडर सुई</h3>
-  <div id="cylinder"></div>
+  <div id="cylinder">मशीन चुनें</div>
 </div>
 
 <button onclick="saveAll()">सेव करें</button>
 
 <script>
-const API = "https://script.google.com/macros/s/AKfycbzK_Yu21KjP9q25TjnQbNzqshO-tm_wOcxDoPID9z5KznXadoI_SA67IsM_4ot09Ebq5Q/exec";
+/* 🔥 CLOUDFLARE WORKER API */
+const API = "https://needle-mountain-76a5.rkknitfabsachin.workers.dev";
+
 let entries = [];
 
+/* ========= LOAD MACHINES ========= */
 async function loadMachines(){
-  const r = await fetch(API+'?action=machines');
-  const m = await r.json();
-  machine.innerHTML = '<option value="">-- चुनें --</option>' +
-    m.map(x=>`<option>${x}</option>`).join('');
+  try{
+    const res = await fetch(API + "?action=machines");
+    const machines = await res.json();
+
+    const sel = document.getElementById("machine");
+    sel.innerHTML = '<option value="">-- मशीन चुनें --</option>';
+    machines.forEach(m=>{
+      sel.innerHTML += `<option value="${m}">${m}</option>`;
+    });
+  }catch(e){
+    alert("मशीन लोड नहीं हुई");
+    console.error(e);
+  }
 }
 
+/* ========= LOAD NEEDLES ========= */
 async function loadNeedles(){
-  dial.innerHTML = cylinder.innerHTML = '';
+  const m = machine.value;
+  document.getElementById("dial").innerHTML = '';
+  document.getElementById("cylinder").innerHTML = '';
   entries = [];
 
-  const m = machine.value;
-  if(!m) return;
+  if(!m){
+    dial.innerHTML = cylinder.innerHTML = 'मशीन चुनें';
+    return;
+  }
 
-  const r = await fetch(API+`?action=needles&machine=${m}`);
-  const d = await r.json();
+  try{
+    const res = await fetch(API + "?action=needles&machine=" + m);
+    const data = await res.json();
 
-  render(d.dial,'dial','Dial');
-  render(d.cylinder,'cylinder','Cylinder');
+    renderNeedles(data.dial, "dial", "Dial");
+    renderNeedles(data.cylinder, "cylinder", "Cylinder");
+  }catch(e){
+    alert("सुई लोड नहीं हुई");
+    console.error(e);
+  }
 }
 
-function render(list,el,section){
-  document.getElementById(el).innerHTML = list.map(n=>`
+/* ========= RENDER ========= */
+function renderNeedles(list, containerId, section){
+  const box = document.getElementById(containerId);
+
+  if(list.length === 0){
+    box.innerHTML = "<small>कोई सुई नहीं</small>";
+    return;
+  }
+
+  box.innerHTML = list.map(n => `
     <div class="row">
       <input value="${n}" disabled>
-      <input type="number" min="0" placeholder="Qty"
+      <input type="number" min="0" placeholder="कितनी सुई"
         onchange="addEntry('${section}','${n}',this.value)">
     </div>
   `).join('');
 }
 
-function addEntry(section,needle,qty){
-  if(!qty) return;
-  entries = entries.filter(e=>!(e.section===section && e.needle===needle));
+/* ========= COLLECT ENTRY ========= */
+function addEntry(section, needle, qty){
+  if(!qty || qty <= 0) return;
+
+  entries = entries.filter(e => !(e.section === section && e.needle === needle));
+
   entries.push({
     machine: machine.value,
-    section, needle,
+    section,
+    needle,
     qty: Number(qty)
   });
 }
 
+/* ========= SAVE ========= */
 async function saveAll(){
-  if(entries.length===0){alert('कोई एंट्री नहीं');return;}
+  if(entries.length === 0){
+    alert("कोई एंट्री नहीं है");
+    return;
+  }
 
-  await fetch(API,{
-    method:'POST',
-    body:JSON.stringify({action:'save',entries})
-  });
+  try{
+    await fetch(API,{
+      method:"POST",
+      body:JSON.stringify({
+        action:"save",
+        entries: entries
+      })
+    });
 
-  alert('सेव हो गया');
-  loadNeedles();
+    alert("डेटा सेव हो गया");
+    loadNeedles();
+  }catch(e){
+    alert("सेव नहीं हुआ");
+    console.error(e);
+  }
 }
 
 loadMachines();
