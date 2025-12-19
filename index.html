@@ -85,7 +85,9 @@ let entries = [];
 async function loadMachines(){
   try{
     const res = await fetch(API + "?action=machines");
-    const machines = await res.json();
+const text = await res.text();
+const machines = JSON.parse(text);
+
 
     const sel = document.getElementById("machine");
     sel.innerHTML = '<option value="">-- मशीन चुनें --</option>';
@@ -112,7 +114,9 @@ async function loadNeedles(){
 
   try{
     const res = await fetch(API + "?action=needles&machine=" + m);
-    const data = await res.json();
+const text = await res.text();
+const data = JSON.parse(text);
+
 
     renderNeedles(data.dial, "dial", "Dial");
     renderNeedles(data.cylinder, "cylinder", "Cylinder");
