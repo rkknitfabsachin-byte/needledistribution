@@ -4,15 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>सुई वितरण</title>
+
 <style>
 body{font-family:system-ui;background:#f4f6f8;margin:0;padding:16px}
 .card{background:#fff;border-radius:14px;padding:14px;margin-bottom:14px}
 select,input,button{width:100%;padding:10px;margin-top:8px;font-size:16px}
 button{background:#111;color:#fff;border:none;border-radius:10px}
-.row{display:flex;gap:8px}
+.row{display:flex;gap:8px;margin-top:8px}
 .row>*{flex:1}
+input[disabled]{background:#f0f0f0}
 </style>
 </head>
+
 <body>
 
 <h2>🪡 सुई वितरण</h2>
@@ -40,6 +43,7 @@ button{background:#111;color:#fff;border:none;border-radius:10px}
 const API = "https://needle-mountain-76a5.rkknitfabsachin.workers.dev";
 let entries = [];
 
+/* ========= LOAD MACHINES ========= */
 async function loadMachines(){
   const res = await fetch(API + "?action=machines");
   const data = JSON.parse(await res.text());
@@ -56,6 +60,7 @@ async function loadMachines(){
   });
 }
 
+/* ========= LOAD NEEDLES ========= */
 async function loadNeedles(){
   dial.innerHTML = cylinder.innerHTML = '';
   entries = [];
@@ -68,16 +73,18 @@ async function loadNeedles(){
   const res = await fetch(API + "?action=needles&machine=" + machine.value);
   const data = JSON.parse(await res.text());
 
-  if (!data || !Array.isArray(data.dial) || !Array.isArray(data.cylinder)) {
+  if (!data || !Array.isArray(data.needles)) {
     alert("Server error");
     console.error(data);
     return;
   }
 
-  render(data.dial, 'dial', 'Dial');
-  render(data.cylinder, 'cylinder', 'Cylinder');
+  // 🔥 SAME NEEDLES BOTH SIDES
+  render(data.needles, 'dial', 'Dial');
+  render(data.needles, 'cylinder', 'Cylinder');
 }
 
+/* ========= RENDER ========= */
 function render(list, id, section){
   const box = document.getElementById(id);
   if(list.length === 0){
@@ -94,12 +101,20 @@ function render(list, id, section){
   `).join('');
 }
 
+/* ========= COLLECT ========= */
 function addEntry(section, needle, qty){
   if(!qty || qty <= 0) return;
+
   entries = entries.filter(e => !(e.section===section && e.needle===needle));
-  entries.push({ machine: machine.value, section, needle, qty: Number(qty) });
+  entries.push({
+    machine: machine.value,
+    section,      // USER decides Dial / Cylinder
+    needle,
+    qty: Number(qty)
+  });
 }
 
+/* ========= SAVE ========= */
 async function saveAll(){
   if(entries.length === 0){
     alert("कोई एंट्री नहीं");
@@ -117,5 +132,6 @@ async function saveAll(){
 
 loadMachines();
 </script>
+
 </body>
 </html>
