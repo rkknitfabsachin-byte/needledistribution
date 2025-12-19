@@ -4,54 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>सुई वितरण</title>
-
 <style>
-  body{
-    margin:0;
-    padding:16px;
-    background:#f4f6f8;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont;
-  }
-  h2{margin:0 0 12px}
-  h3{margin:0 0 8px}
-  .card{
-    background:#fff;
-    border-radius:14px;
-    padding:14px;
-    margin-bottom:14px;
-  }
-  label{
-    font-size:14px;
-    color:#444;
-  }
-  select,input,button{
-    width:100%;
-    padding:10px;
-    margin-top:8px;
-    font-size:16px;
-    border-radius:10px;
-    border:1px solid #ddd;
-  }
-  button{
-    background:#111;
-    color:#fff;
-    border:none;
-    font-weight:600;
-  }
-  .row{
-    display:flex;
-    gap:8px;
-    margin-top:8px;
-  }
-  .row input:first-child{
-    background:#f0f0f0;
-  }
-  .row > *{
-    flex:1;
-  }
+body{font-family:system-ui;background:#f4f6f8;margin:0;padding:16px}
+.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:14px}
+select,input,button{width:100%;padding:10px;margin-top:8px;font-size:16px}
+button{background:#111;color:#fff;border:none;border-radius:10px}
+.row{display:flex;gap:8px}
+.row>*{flex:1}
 </style>
 </head>
-
 <body>
 
 <h2>🪡 सुई वितरण</h2>
@@ -59,7 +20,7 @@
 <div class="card">
   <label>मशीन चुनें</label>
   <select id="machine" onchange="loadNeedles()">
-    <option value="">-- मशीन चुनें --</option>
+    <option value="">-- चुनें --</option>
   </select>
 </div>
 
@@ -76,114 +37,85 @@
 <button onclick="saveAll()">सेव करें</button>
 
 <script>
-/* 🔥 CLOUDFLARE WORKER API */
 const API = "https://needle-mountain-76a5.rkknitfabsachin.workers.dev";
-
 let entries = [];
 
-/* ========= LOAD MACHINES ========= */
 async function loadMachines(){
-  try{
-    const res = await fetch(API + "?action=machines");
-const text = await res.text();
-const machines = JSON.parse(text);
+  const res = await fetch(API + "?action=machines");
+  const data = JSON.parse(await res.text());
 
-
-    const sel = document.getElementById("machine");
-    sel.innerHTML = '<option value="">-- मशीन चुनें --</option>';
-    machines.forEach(m=>{
-      sel.innerHTML += `<option value="${m}">${m}</option>`;
-    });
-  }catch(e){
-    alert("मशीन लोड नहीं हुई");
-    console.error(e);
+  if (!Array.isArray(data)) {
+    alert("Server error");
+    console.error(data);
+    return;
   }
+
+  machine.innerHTML = '<option value="">-- चुनें --</option>';
+  data.forEach(m => {
+    machine.innerHTML += `<option value="${m}">${m}</option>`;
+  });
 }
 
-/* ========= LOAD NEEDLES ========= */
 async function loadNeedles(){
-  const m = machine.value;
-  document.getElementById("dial").innerHTML = '';
-  document.getElementById("cylinder").innerHTML = '';
+  dial.innerHTML = cylinder.innerHTML = '';
   entries = [];
 
-  if(!m){
+  if(!machine.value){
     dial.innerHTML = cylinder.innerHTML = 'मशीन चुनें';
     return;
   }
 
-  try{
-    const res = await fetch(API + "?action=needles&machine=" + m);
-const text = await res.text();
-const data = JSON.parse(text);
+  const res = await fetch(API + "?action=needles&machine=" + machine.value);
+  const data = JSON.parse(await res.text());
 
-
-    renderNeedles(data.dial, "dial", "Dial");
-    renderNeedles(data.cylinder, "cylinder", "Cylinder");
-  }catch(e){
-    alert("सुई लोड नहीं हुई");
-    console.error(e);
+  if (!data || !Array.isArray(data.dial) || !Array.isArray(data.cylinder)) {
+    alert("Server error");
+    console.error(data);
+    return;
   }
+
+  render(data.dial, 'dial', 'Dial');
+  render(data.cylinder, 'cylinder', 'Cylinder');
 }
 
-/* ========= RENDER ========= */
-function renderNeedles(list, containerId, section){
-  const box = document.getElementById(containerId);
-
+function render(list, id, section){
+  const box = document.getElementById(id);
   if(list.length === 0){
-    box.innerHTML = "<small>कोई सुई नहीं</small>";
+    box.innerHTML = 'कोई सुई नहीं';
     return;
   }
 
   box.innerHTML = list.map(n => `
     <div class="row">
       <input value="${n}" disabled>
-      <input type="number" min="0" placeholder="कितनी सुई"
+      <input type="number" min="0" placeholder="Qty"
         onchange="addEntry('${section}','${n}',this.value)">
     </div>
   `).join('');
 }
 
-/* ========= COLLECT ENTRY ========= */
 function addEntry(section, needle, qty){
   if(!qty || qty <= 0) return;
-
-  entries = entries.filter(e => !(e.section === section && e.needle === needle));
-
-  entries.push({
-    machine: machine.value,
-    section,
-    needle,
-    qty: Number(qty)
-  });
+  entries = entries.filter(e => !(e.section===section && e.needle===needle));
+  entries.push({ machine: machine.value, section, needle, qty: Number(qty) });
 }
 
-/* ========= SAVE ========= */
 async function saveAll(){
   if(entries.length === 0){
-    alert("कोई एंट्री नहीं है");
+    alert("कोई एंट्री नहीं");
     return;
   }
 
-  try{
-    await fetch(API,{
-      method:"POST",
-      body:JSON.stringify({
-        action:"save",
-        entries: entries
-      })
-    });
+  await fetch(API, {
+    method: "POST",
+    body: JSON.stringify({ action:"save", entries })
+  });
 
-    alert("डेटा सेव हो गया");
-    loadNeedles();
-  }catch(e){
-    alert("सेव नहीं हुआ");
-    console.error(e);
-  }
+  alert("सेव हो गया");
+  loadNeedles();
 }
 
 loadMachines();
 </script>
-
 </body>
 </html>
